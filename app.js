@@ -8,6 +8,8 @@ var GroupState  = require('./modules/groupState');
 var userService = require('./modules/userService');
 var config      = require('./modules/config');
 
+//my string
+
 function initDB(callback){
   userService.dropTable(()=>{
     var targetSteamIds = config.get("targetSteamIds");  
