@@ -1,12 +1,6 @@
 {
   "targetSteamIds" : [
-    "76561198015639477",
-    "76561198350152333"
+    "76561198073408854"
   ],
-  "botAccountName": "djtaffy1",
-  "foo": {
-    "bar":{
-      "goo":"test"
-    }
-  }
+  "botAccountName": "djtaffy1"  
 }
