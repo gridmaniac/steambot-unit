@@ -385,7 +385,7 @@ function checkRelationshipsAfterOffline(callback){
 function checkMessagesAfterOffline(sendersIds, callback){
       
   async.each(sendersIds,(senderId,callback)=>{
-    log(LogStatus.LOG, `Пользователь ${steamId} прислал сообщение, пока бот был в оффлайне`);
+    log(LogStatus.LOG, `Пользователь ${senderId} прислал сообщение, пока бот был в оффлайне`);
     userService.getChatState(senderId,(err,chatState)=>{
       if (err) return callback(err);
 
@@ -477,9 +477,10 @@ function handleUnfinishedFriends(callback){
             var now = moment().format('x');
             // Если приглашение в друзья было отправлено достаточно давно - отправить еще раз
             if (now - lastInvitationDate > options.friend_invitation_timeout) {
-              // TODO проверить на нескольких пользователях
+              // TODO протестировать
               addFriend(steamId, callback);
             }
+            // TODO закомментировано т.к. callback теперь передается в addFriend. Убрать после тестирования
             //return callback(null);
           });      
         },(err)=>{
@@ -606,14 +607,17 @@ function handleFriendRelationship(steamId, eFriendRelationship){
 */ 
 steamUser.on('loggedOn', function(details) {
   log(LogStatus.LOG, "Зашел в Steam");  
-  steamUser.setPersona(SteamUser.EPersonaState.Online);
+  
+  // TODO протестировать  
+  // Установка статуса Offline, чтобы пользователи писали сообщения, прежде чем бот будет готов их обработать
+  steamUser.setPersona(SteamUser.EPersonaState.Offline);
   
   // DEBUG
   /* handleUnfinishedFriends((err)=>{
     console.log(err);
   }); */
 
-   // Обработка события получения списка друзей
+  // Обработка события получения списка друзей
   steamUser.on('friendsList', ()=>{
     // Обработка события получения списка сообщений полученных в оффлайне    
     // 'offlineMessages' обрабатывается внутри обработчика 'friendsList'
@@ -642,12 +646,44 @@ steamUser.on('loggedOn', function(details) {
         },
         ],
         (err,results)=>{
-          if (err) throw err;
+          if (err) {
+            log(LogStatus.ERR, `Не удалось запустить основной цикл обработки пользователей. Причина: ${err.msg}`);
+            // Временный хак, чтобы log() успел сделать запись в БД, прежде чем бот упадет
+            setTimeout(()=>{
+              throw new Error(`Не удалось запустить основной цикл обработки пользователей. Причина: ${err.msg}`);            
+            },4000);
+            // вызов return приведет к выходу из всех вложенных обработчиков
+            return;
+          }
           
-          // TODO
-          // Вычислять timeout по 24часа/кол-во пользователей надо добавить в сутки
-          // 86400000/ 125  + (random(-1) * random(0, 60*1000))
-          // Главный loop, инициирующий работу с новыми пользователями
+          // Начало обработки онлайн событий и работы с новыми пользователями
+          steamUser.setPersona(SteamUser.EPersonaState.Online);
+
+          /*
+            Обработка события получения сообщения
+            // TODO протестировать
+          */ 
+          steamUser.on('friendMessage',function(steamId, msg) {
+            log(LogStatus.LOG, `Получил сообщение от Пользователя ${steamId}: "${msg}"`);
+            handleMessage(steamId.getSteamID64());
+          });
+
+          /*
+            Обработка события изменения состояния дружбы с пользователем
+            // TODO протестировать
+          */
+          steamUser.on('friendRelationship', function(sid, eFriendRelationship) {
+            var steamId = sid.getSteamID64();
+            handleFriendRelationship(steamId, eFriendRelationship);
+          });
+                              
+          /*
+            С периочностью timeout милисекунд вызывать метод обрабатывающий нового Пользователя из БД
+
+            // TODO
+            // Вычислять timeout по 24часа/кол-во пользователей надо добавить в сутки
+            // 86400000/ 125  + (random(-1) * random(0, 60*1000))
+          */
           var timeout = 5000;
           setInterval(handleNewUser, timeout);          
         }
@@ -655,25 +691,6 @@ steamUser.on('loggedOn', function(details) {
 
     });  
   }); 
-});
-
-// TODO Переместить .on('friendMessage') и .on('friendRelationship') перед spamLoop, но проверить, 
-//      срабатывают ли события, если пользователь совершил действие, до создания listeners
-
-/*
-  Обработка события получения сообщения
-*/ 
-steamUser.on('friendMessage',function(steamId, msg) {
-  log(LogStatus.LOG, `Получил сообщение от Пользователя ${steamId}: "${msg}"`);
-  handleMessage(steamId.getSteamID64());
-});
-
-/*
-  Обработка события изменения состояния дружбы с пользователем
-*/
-steamUser.on('friendRelationship', function(sid, eFriendRelationship) {
-  var steamId = sid.getSteamID64();
-  handleFriendRelationship(steamId, eFriendRelationship);
 });
 
 /*

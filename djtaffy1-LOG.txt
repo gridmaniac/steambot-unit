@@ -76,3 +76,10 @@ LOG 08.08.2017 02:21:34 : djtaffy1 : Зашел в Steam
 LOG 08.08.2017 02:22:13 : djtaffy1 : Зашел в Steam
 LOG 08.08.2017 02:29:52 : djtaffy1 : Зашел в Steam
 LOG 08.08.2017 02:58:48 : djtaffy1 : Зашел в Steam
+LOG 08.08.2017 18:34:03 : djtaffy1 : Зашел в Steam
+LOG 08.08.2017 18:34:28 : djtaffy1 : Зашел в Steam
+LOG 08.08.2017 18:35:30 : djtaffy1 : Удален из друзей Пользователем test_user_3_FRIEND_NOT_STARTED, пока был в оффлайне.
+LOG 08.08.2017 18:35:30 : djtaffy1 : Удален из друзей Пользователем test_user_4_FRIEND_REPLIED_TO_HELLO, пока был в оффлайне.
+LOG 08.08.2017 18:36:15 : djtaffy1 : Зашел в Steam
+LOG 08.08.2017 18:38:39 : djtaffy1 : Зашел в Steam
+LOG 08.08.2017 18:39:18 : djtaffy1 : Зашел в Steam
