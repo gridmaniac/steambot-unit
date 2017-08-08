@@ -3,7 +3,6 @@ var mysql       = require('mysql');
 var FriendState = require('../friendState');
 var ChatState   = require('../chatState');
 var GroupState  = require('../groupState');
-var config      = require('../config');
 
 module.exports = UserService;
 
@@ -31,18 +30,6 @@ function UserService(options) {
   botAccountName = this.botAccountName;
   groupId = this.groupId;  
 }
-
-// function isRecordExists(steamId, callback){
-//   connection.query('SELECT COUNT(*) FROM users WHERE steamId = ?',[steamId],function(err, results, fields) {
-//     if (err) return callback(err);
-//     console.log(results);
-//     if (results.count != 0) {
-//       return callback(null, true);
-//     } else {
-//       return callback(null, false);
-//     }
-//   });
-// }
 
 // Преобразовать результаты запроса по fieldname из resultsObject в обычный массив
 function queryResultsToArray(fieldname, resultsObject) {
@@ -358,6 +345,26 @@ UserService.prototype.getSteamIds = function(callback) {
       if (err) return callback(err);                  
       var steamIds = queryResultsToArray("steamId", results);
       return callback(null, steamIds);
+    }
+  );
+}
+
+UserService.prototype.log = function(status, message){
+  connection.query(`
+    INSERT INTO
+      log
+         (status,
+          timestamp,
+          botAccountName,
+          message)
+    VALUES
+        ("${status}",			
+          NOW(),
+          "${this.botAccountName}",
+          "${message}")
+    `,(err, results)=>{
+      console.log('test');
+      //ничего не делать...callback-и от log-ов не нужны
     }
   );
 }

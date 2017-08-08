@@ -1,0 +1,13 @@
+<config>
+  <sendHelloMessage>
+    <readingTimeout>4000</readingTimeout>
+    <typingTimeout>5000</typingTimeout>    
+    <helloMessage>Привет</helloMessage>
+  </sendHelloMessage>
+  <inviteToGroup>
+    <readingTimeout>5000</readingTimeout>
+    <typingTimeout>8000</typingTimeout>    
+    <responseMessage>Мы дарим призы. Чтобы получить подарок, вступи в группу TestRiders</responseMessage>
+    <invitationTimeout>9000</invitationTimeout>
+  </inviteToGroup>
+</config>
