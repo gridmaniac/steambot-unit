@@ -426,6 +426,14 @@ function handleUnfinishedFriends(callback){
   // TODO возможно необходимо добавить функцию getInvited, и проверять, как давно отправлялось приглашение
   async.parallel({
     // Получить записи пользователей, которые
+    // давно не отвечают на приглашение в друзья
+    invitedList: (callback) => {
+      userService.getInvited((err, ids)=>{
+        if (err) return callback(err);
+        return callback(null, ids);
+      });
+    },
+    // Получить записи пользователей, которые
     // отклонили приглашение в друзья
     declinedList: (callback)=>{
       userService.getDeclined((err, declinedList)=>{
@@ -464,14 +472,14 @@ function handleUnfinishedFriends(callback){
     var declinedList = results.declinedList;
     var chatNotStartedList = results.chatNotStartedList;
     var repliedToHelloList = results.repliedToHelloList;  
-    // removedList и declinedList логично объединить, т.к. к ним
+    // invitedList,  removedList, declinedList логично объединить, т.к. к ним
     // применимо единое правило - если пользователя приглашали достаточно давно - пригласить еще раз
-    var removedAndDeclinedList = removedList.concat(declinedList);
+    var invitedRemovedDeclinedList = invitedList.concat(removedList.concat(declinedList));
     
     async.parallel([
       // всем удалившимся и отказавшимся попытаться отправить приглашение в друзья еще раз
       (callback)=>{        
-        async.each(removedAndDeclinedList,(steamId, callback)=>{
+        async.each(invitedRemovedDeclinedList,(steamId, callback)=>{
           userService.getLastInvitationDate(steamId,(err, lastInvitationDate)=>{
             if (err) return callback(err);
             var now = moment().format('x');
