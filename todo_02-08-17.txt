@@ -13,7 +13,7 @@
 	chat state
 		0 - сообщения не отправлялись
 		1 - отправлено приветствие
-		2 - получена реакция на приветствие		
+		2 - пользователь что-то написал (ответил на приветствие, написал первым - не важно)
 		3 - отправлено приглашение / скинута ссылка на группу
 		4 - отправлено сообщение "ожидайте подарка"
 
@@ -89,3 +89,23 @@
 
 https://docs.google.com/document/d/1-ASu7p21uorPG_LunYBtck28_oFEutWFIgOuNjJa13s/edit
 http://steamidfinder.com/lookup/76561198073408854/
+
+[0]
++  TODO Установить правильный chatState в зависимости от предыдущего chatState  - checkMessagesAfterOffline
++  TODO Обрабатывать owned записи                                               - handleUnfinishedFriends
+
+// TODO fix test hack - пофиксить хак против спама пользователя
+// TODO Переместить .on('friendMessage') и .on('friendRelationship') перед spamLoop, но проверить, 
+//      срабатывают ли события, если пользователь совершил действие, до создания listeners
+
+[1]
++  TODO решить, есть ли необходимость обнулять поля записи                      - handleFriendRelationship
+                                    (кроме lastInvintationDate)
+// TODO Вычислять timeout по 24часа/кол-во пользователей надо добавить в сутки
+
+[2]
+// TODO писать лог в БД
+// TODO заменить константы timeout-ов числами из конфига                        - sendHelloMessage
+// TODO заменить строковые константы строками из конфига                        - sendHelloMessage
+// TODO заменить константы timeout-ов числами из конфига                        - inviteToGroup
+// TODO помечать сообщения как прочитанные                                      - checkMessagesAfterOffline

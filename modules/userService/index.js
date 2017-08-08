@@ -11,6 +11,12 @@ var connection;
 var botAccountName;
 var groupId;
 
+/*  
+  ВНИМАНИЕ: Подразумевается, что один бот использует один UserService!
+            Не создавайте более одного экземпляра класса UserService в рамках одного бота!
+            Любые методы выполняют запросы с проверкой соответствия полей botAccountName и groupId
+            (кроме debug методов, обозначенных явно)
+*/
 function UserService(options) {
   this.botAccountName = options.login;
   this.groupId = options.groupId;
@@ -38,6 +44,7 @@ function UserService(options) {
 //   });
 // }
 
+// Преобразовать результаты запроса по fieldname из resultsObject в обычный массив
 function queryResultsToArray(fieldname, resultsObject) {
   var array = [];
   for (var i = 0; i < resultsObject.length; i++) {
@@ -46,6 +53,7 @@ function queryResultsToArray(fieldname, resultsObject) {
   return array;
 }
 
+// Обновить значение поля fieldName значением value для записи с соответствующим steamId
 function updateFieldBySteamId(steamId, fieldName, value,  callback){
   // check if callback is function
   callback = typeof callback === 'function' ? callback : function(){};
@@ -69,6 +77,7 @@ function updateFieldBySteamId(steamId, fieldName, value,  callback){
   );
 }
 
+// Получить значение поля fieldName из записи с соответствующим значением steamId
 function selectFieldBySteamId(steamId, fieldName, callback) {
   connection.query(`
     SELECT
@@ -92,6 +101,7 @@ function selectFieldBySteamId(steamId, fieldName, callback) {
   );
 }
 
+// Выбрать steamId записей, соответствующих условию fieldName == fieldValue
 function selectSteamIdsByField(fieldName, fieldValue, callback) {
   connection.query(`
     SELECT
@@ -117,6 +127,8 @@ function selectSteamIdsByField(fieldName, fieldValue, callback) {
   );
 }
 
+// use only for debug purposes
+// Уничтожаеть ВСЕ записи в таблице users
 UserService.prototype.dropTable = function(callback){
   connection.query('DELETE FROM users',(err,results)=>{
     if (err) return callback(err);
@@ -124,6 +136,9 @@ UserService.prototype.dropTable = function(callback){
   });
 };
 
+// use only for debug purposes
+// Добавить в базу новые записи пользователей из переданных targetSteamIds
+// ВНИМАНИЕ: записи создаются сразу с присвоенным botAccountName, соответствующим текущему боту
 UserService.prototype.initDBRecords = function (targetSteamIds, callback){
   if (targetSteamIds.length == 0) {
     return callback(new Error("No steamIds were passed to the function"));
@@ -162,9 +177,11 @@ UserService.prototype.initDBRecords = function (targetSteamIds, callback){
   });
 },
 
+// Выбрать нового пользователя: "заблокировать" его запись от других ботов, получить steamId пользователя
 UserService.prototype.pickNewUser = function(callback){
   
   async.series({
+      // Установить "свой" botAccountName, чтобы другие боты не попытались работать с данной записью
       lockUserRecord: (callback)=>{
         connection.query(`
           UPDATE
@@ -185,6 +202,7 @@ UserService.prototype.pickNewUser = function(callback){
         );
       },
 
+      // Получить steamId. Есть шанс, что будет взят не той записи, которая была создана, но это не должно вызвать проблем
       getNewUserSteamId:  (callback)=>{
         connection.query(`
           SELECT
@@ -222,6 +240,110 @@ UserService.prototype.pickNewUser = function(callback){
   );
 }
 
+/*
+  Получить записи тех пользователей, которые: 
+    отклонили приглашение в друзья
+*/
+UserService.prototype.getDeclined = function(callback) {
+  connection.query(`
+    SELECT
+      steamId
+    FROM
+      users
+    WHERE     
+      friendState     = ${FriendState.DECLINED}
+      AND
+      botAccountName  = "${this.botAccountName}"
+      AND
+      groupId         = "${this.groupId}"`,
+    (err, results, fields)=>{
+      if (err) return callback(err);
+      var steamIds = queryResultsToArray("steamId", results);
+      return callback(null, steamIds);
+    }
+  );
+}
+
+/*
+  Получить записи тех пользователей, которые: 
+    удалили бота из друзей & (приглашение в группу не отправлено || оповещение о подарке не отправлено)
+*/
+UserService.prototype.getRemoved = function(callback) {
+  connection.query(`
+    SELECT
+      steamId
+    FROM
+      users
+    WHERE     
+      friendState     = ${FriendState.REMOVED}      
+      AND
+      chatState       < ${ChatState.GROUP_INVITATION_SENT}
+      AND
+      botAccountName  = "${this.botAccountName}"
+      AND
+      groupId         = "${this.groupId}"`,
+    (err, results, fields)=>{
+      if (err) return callback(err);
+      var steamIds = queryResultsToArray("steamId", results);
+      return callback(null, steamIds);
+    }
+  );
+}
+
+/*
+  Получить записи тех пользователей, которые: 
+    являются друзьями & переписка не начата
+*/
+UserService.prototype.getChatNotStarted = function(callback) {
+  connection.query(`
+    SELECT
+      steamId
+    FROM
+      users
+    WHERE     
+      friendState     = ${FriendState.FRIEND}      
+      AND
+      chatState       = ${ChatState.NOT_STARTED}
+      AND
+      botAccountName  = "${this.botAccountName}"
+      AND
+      groupId         = "${this.groupId}"`,
+    (err, results, fields)=>{
+      if (err) return callback(err);
+      var steamIds = queryResultsToArray("steamId", results);
+      return callback(null, steamIds);
+    }
+  );
+}
+
+/*
+  Получить записи тех пользователей, которые: 
+    являются друзьями & пользователь ответил на приветственное сообщение
+*/
+UserService.prototype.getRepliedToHello = function(callback) {
+  connection.query(`
+    SELECT
+      steamId
+    FROM
+      users
+    WHERE     
+      friendState     = ${FriendState.FRIEND}      
+      AND
+      chatState       = ${ChatState.USER_REPLIED}
+      AND
+      botAccountName  = "${this.botAccountName}"
+      AND
+      groupId         = "${this.groupId}"`,
+    (err, results, fields)=>{
+      if (err) return callback(err);
+      var steamIds = queryResultsToArray("steamId", results);
+      return callback(null, steamIds);
+    }
+  );
+}
+
+// use only for debug purposes
+// Получить steamId записей относящихся к текущему боту и группе
 UserService.prototype.getSteamIds = function(callback) {
   connection.query(`
     SELECT
