@@ -43,7 +43,7 @@ var options = {
   "chat_config":"chat_config.xml",
   "repeat_invitation_timeout": 60000,
   "online_action_timeout": 60000,
-  "handle_new_user_timeout": 60000,
+  "handle_new_user_timeout": 120000,
   "dbHost":"localhost",
   "dbUser":"root",
   "dbPassword":"123",
@@ -79,14 +79,14 @@ function getConfig(path, callback){
     },
     (callback)=>{
       fs.readFile(path,"utf8",(err, data)=>{
-        if (err) return callback(new Error(`Не удалось прочитать содержимое файла конфигурации. Путь: ${path} Причина: ${err.message}`));
+        if (err) return callback(new Error(`Не удалось прочитать содержимое файла конфигурации. Путь: ${path} \n    Причина: ${err.message}`));
         return callback(null, data);
       });
     },
     (data, callback)=>{
       var parser = new xml2js.Parser();
       parser.parseString(data, (err, jsObject)=>{
-        if (err) return callback(new Error(`Не удалось преобразовать xml конфигурацию в js-объект. Причина:${err.message}`));
+        if (err) return callback(new Error(`Не удалось преобразовать xml конфигурацию в js-объект. \n    Причина:${err.message}`));
         return callback(null, jsObject.config);
       });      
     }
@@ -129,12 +129,13 @@ function blurTimeout(timeout){
   Отправить пользователю приглашение в друзья
 */
 function addFriend(steamId, callback){
-  // check if callback is function
+  // Проверить является ли callback функцией
   callback = typeof callback === 'function' ? callback : function(){};
   
   steamUser.addFriend(steamId, (err)=>{
     if (err) {
-      log(LogStatus.WRN, `Не смог отправить приглашение в друзья Пользователю ${steamId}. Причина: ${err.message}`);
+      log(LogStatus.WRN, `Не смог отправить приглашение в друзья Пользователю ${steamId}. \n    Причина: ${err.message}`);
+      return callback(null);
     }
     log(LogStatus.LOG, `Отправил приглашение в друзья Пользователю ${steamId}`);
     userService.setFriendState(steamId, FriendState.INVITED);
@@ -188,6 +189,7 @@ function inviteToGroup(steamId) {
     (callback)=>{
       setTimeout(()=>{        
         var msg = config.inviteToGroup[0].responseMessage[0];
+        log(LogStatus.LOG, `Отправил Пользователю ${steamId} сообщение о необходимости вступления в группу`);
         steamUser.chatMessage(steamId, msg);
         return callback(null);
       }, config.inviteToGroup[0].typingTimeout[0]);
@@ -214,7 +216,7 @@ function inviteToGroup(steamId) {
 function handleMessage(steamId) {
   userService.getChatState(steamId, function(err, chatState) {
     if (err) {
-      log(LogStatus.WRN, `Не удалось получить chatState Пользователя ${steamId}. Причина: ${err.message}`);
+      log(LogStatus.WRN, `Не удалось получить chatState Пользователя ${steamId}. \n    Причина: ${err.message}`);
       return;
     }
     switch (chatState) {
@@ -263,7 +265,7 @@ function checkUnfriended(oldFriendsList, callback){
   async.each(unfriendedIds, (steamId, callback)=>{
     userService.setFriendState(steamId, FriendState.REMOVED, callback);
   },(err)=>{    
-    if (err) return callback(new Error(`Возникла ошибка при установке friendState для пользователей удаливших бота в оффлайне. Причина: ${err.message}`));
+    if (err) return callback(new Error(`Возникла ошибка при установке friendState для пользователей удаливших бота в оффлайне. \n    Причина: ${err.message}`));
     return callback(null);
   });  
 }
@@ -279,16 +281,16 @@ function checkAccepted(oldInvitedList, callback){
     var steamId = oldInvitedList[i];
     if (newFriendsList[steamId] == EFriendRelationship.Friend){
       log(LogStatus.LOG, `Пользователь ${steamId} принял приглашение в друзья, пока бот был в оффлайне.`);
-      acceptedList.push();
+      acceptedList.push(steamId);
     }
   }
 
-  if (acceptedList.length == 0) log(LogStatus.LOG, `Ни один пользователь принял приглашение в друзья, пока бот был в оффлайне.`);
+  if (acceptedList.length == 0) log(LogStatus.LOG, `Ни один пользователь не принял приглашение в друзья, пока бот был в оффлайне.`);
 
   async.each(acceptedList, (steamId, callback)=>{
     userService.setFriendState(steamId, FriendState.FRIEND, callback);
   },(err)=>{
-    if (err) return callback(new Error(`Возникла ошибка при установке friendState для пользователей принявших приглашение в друзья в оффлайне. Причина: ${err.message}`));
+    if (err) return callback(new Error(`Возникла ошибка при установке friendState для пользователей принявших приглашение в друзья в оффлайне. \n    Причина: ${err.message}`));
     return callback(null);
   });    
 }
@@ -329,7 +331,7 @@ function checkRelationshipsAfterOffline(callback){
       }
     ],function(err,results) {
       if (err) {
-        var errMsg = `Возникла ошибка при обработке изменений в списке друзей произошедших в оффлайне. Причина: ${err.message}`;
+        var errMsg = `Возникла ошибка при обработке изменений в списке друзей произошедших в оффлайне. \n    Причина: ${err.message}`;
         return callback(new Error(errMsg));
       }
       return callback(null);
@@ -358,13 +360,20 @@ function checkMessagesAfterOffline(sendersIds, callback){
           // TODO протестировать
           userService.setChatState(senderId, ChatState.USER_REPLIED, callback);
           break;
+        
         // Пользователь уже что-то отвечал
+        // Ничего не делать, так как обработчик userService.getRepliedToHello его подберет        
         case ChatState.USER_REPLIED:
-          // Ничего не делать, так как обработчик userService.getRepliedToHello его подберет
-          break;
+        
+        // Пользователь уже получил приглашение в группу/сообщение о подарке
+        // Ничего не делать, работа с Пользователем закончена...
         case ChatState.GROUP_INVITATION_SENT:
-        case ChatState.GIFT_MESSAGE_SENT:
-          // Ничего не делать, так как приглашение в группу/сообщение о подарке уже выслано
+        case ChatState.GIFT_MESSAGE_SENT:                    
+
+        // chatState будет undefined если пользователь приславший сообщение не записан в БД соответствующей парой steamId-groupId
+        // можно игнорировать...
+        default:
+          return callback(null);
           break;
       }
       // TODO закоментированно т.к. callback передается в setChatState. Убрать после теста
@@ -372,7 +381,7 @@ function checkMessagesAfterOffline(sendersIds, callback){
     });
   },(err)=>{
     if (err) {
-      var errMsg = `Возникла ошибка при обработке сообщений полученных в оффлайне. Причина: ${err.message}`;
+      var errMsg = `Возникла ошибка при обработке сообщений полученных в оффлайне. \n    Причина: ${err.message}`;
       return callback(new Error(errMsg));
     }
     return callback(null);
@@ -428,7 +437,7 @@ function handleUnfinishedFriends(callback){
       });
     },
   }, (err, results)=>{
-    if (err) return callback(new Error(`Возникла ошибка при получении записей пользователей работа с которыми начата но незавершена. Причина: ${err.message}`));
+    if (err) return callback(new Error(`Возникла ошибка при получении записей пользователей работа с которыми начата но незавершена. \n    Причина: ${err.message}`));
     
     var invitedList = results.invitedList;
     var removedList = results.removedList;
@@ -484,7 +493,7 @@ function handleUnfinishedFriends(callback){
       }
     ],    
     (err, results)=>{
-      if (err) return callback(new Error(`Возникла ошибка при обработке записей пользователей работа с которыми начата но незавершена. Причина: ${err.message}`));
+      if (err) return callback(new Error(`Возникла ошибка при обработке записей пользователей работа с которыми начата но незавершена. \n    Причина: ${err.message}`));
       return callback(null);
     });                      
   });      
@@ -540,7 +549,7 @@ function handleFriendRelationship(steamId, eFriendRelationship){
     case EFriendRelationship.None:      
       userService.getFriendState(steamId, function(err, friendState){
         if (err) {
-          log(`Возникла ошибка при попытке получения friendState записи Пользователя ${steamId} Причина: ${err.message}`);
+          log(`Возникла ошибка при попытке получения friendState записи Пользователя ${steamId} \n    Причина: ${err.message}`);
           return;
         }
         if (friendState == FriendState.FRIEND) {
@@ -627,7 +636,7 @@ steamUser.on('loggedOn', function(details) {
         ],
         (err,results)=>{
           if (err) {
-            var errMsg = `Не удалось запустить основной цикл обработки пользователей. Причина: ${err.message}`;
+            var errMsg = `Не удалось запустить основной цикл обработки пользователей. \n    Причина: ${err.message}`;
             log(LogStatus.ERR, errMsg);
             return;
           }
@@ -654,7 +663,10 @@ steamUser.on('loggedOn', function(details) {
             var steamId = sid.getSteamID64();
             handleFriendRelationship(steamId, eFriendRelationship);
           });
-                              
+          
+          // TODO debug
+          handleNewUser();
+
           /*
             С периочностью timeout милисекунд вызывать метод обрабатывающий нового Пользователя из БД            
           */
@@ -679,9 +691,9 @@ steamUser.on('error', function(err) {
 */
 steamUser.on('disconnected', function(eresult, msg){
   if (eresult == 0){
-    log(LogStatus.ERR, `Отключен от Steam без отправки сообщения о разрыве соединения на сервер. Причина отключения (может быть неопределенной): ${msg}`);
+    log(LogStatus.ERR, `Отключен от Steam без отправки сообщения о разрыве соединения на сервер. \n    Причина отключения (может быть неопределенной): ${msg}`);
   }
-  log(LogStatus.ERR, `Отключен от Steam. Причина отключения (может быть неопределенной): ${msg}`);
+  log(LogStatus.ERR, `Отключен от Steam. \n    Причина отключения (может быть неопределенной): ${msg}`);
 });
 
 /*
