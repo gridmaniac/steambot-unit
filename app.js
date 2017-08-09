@@ -31,27 +31,30 @@ const optionDefinitions = [
   { name: 'dbDatabase',                 alias: 'dbd', type: String }
 ];
 
-// TODO uncomment
-//const options = commandLineArgs(optionDefinitions);
+// Параметры запуска бота. В обычном режиме получаются через командную строку  
+var options = {};
 
-/*
-  Параметры запуска бота. В нормальном режиме получаются через командную строку
-  DEBUG ONLY!
-*/
-var options = {
-  "login": "djtaffy1",
-  "password": "mxi7mngs4",  
-  "groupId":"103582791459120719",
-  "chat_config":"chat_config.xml",
-  "repeat_invitation_timeout": 60000,
-  "online_action_timeout": 60000,
-  "handle_new_user_timeout": 120000,
-  "thanksgiving_timeout": 30000,
-  "dbHost":"localhost",
-  "dbUser":"root",
-  "dbPassword":"123",
-  "dbDatabase":"steam-bot"
-};
+// Проверить был ли запущен код через childProcess.fork | https://coderwall.com/p/_gvaoa/detect-if-a-script-has-been-forked-in-nodejs
+if (process.send) {
+  options = commandLineArgs(optionDefinitions);
+} else {
+  log(LogStatus.LOG, `Запуск в режиме отладки...`);
+  // Если код запущен в режиме отладки параметры командной строки игнорируются
+  options = {
+    "login": "djtaffy1",
+    "password": "mxi7mngs4",  
+    "groupId":"103582791459120719",
+    "chat_config":"chat_config.xml",
+    "repeat_invitation_timeout": 60000,
+    "online_action_timeout": 60000,
+    "handle_new_user_timeout": 120000,
+    "thanksgiving_timeout": 30000,
+    "dbHost":"localhost",
+    "dbUser":"root",
+    "dbPassword":"123",
+    "dbDatabase":"steam-bot"
+  };
+}
 
 var userService = new UserService(options);
 var steamUser = new SteamUser();
@@ -104,17 +107,7 @@ function getConfig(path, callback){
   Записать сообщение msg в лог со статусом status
 */
 function log(status, msg, debug){
-
-  console.log(`${LogStatus[status]} ${msg}`);
-
-  // если передан параметр отладки, писать лог в текстовый файл
-  if (debug) {
-    var string = `\n${LogStatus[status]} ${moment().format('L')} ${moment().format('LTS')} : ${options.login} : ${msg}`;  
-    var fs = require('fs');
-    fs.appendFile(`${options.login}-LOG.txt`, string);
-    return;
-  }
-  // иначе писать в БД
+  console.log(`${LogStatus[status]} ${msg}`);  
   userService.log(LogStatus[status], msg);
 }
 
@@ -573,6 +566,7 @@ function handleThanksgiving(){
     // Если steamId undefined, значит новых вступивших в группу не появилось...
     if (!steamId)
       return;
+    // timeout не обязателен, так метод вызывается внутри setInterval и только для одной записи
     sendThanksMessage(steamId);
   });
 }
@@ -707,7 +701,8 @@ steamUser.on('loggedOn', function(details) {
             handleFriendRelationship(steamId, eFriendRelationship);
           });
           
-          // TODO debug
+          // TODO решить убрать или оставить этот вызов
+          // Взять нового пользователя из БД. Последующие будут обработаны через setInterval
           handleNewUser();
 
           /*
