@@ -11,6 +11,7 @@ var moment              = require('moment');
 var FriendState         = require('./modules/friendState');
 var ChatState           = require('./modules/chatState');
 var GroupState          = require('./modules/groupState');
+var SendThanksState     = require('./modules/sendThanksState');
 var UserService         = require('./modules/userService');
 var LogStatus           = require('./modules/logStatus');
 
@@ -21,6 +22,7 @@ const optionDefinitions = [
   { name: 'repeat_invitation_timeout',  alias: 'r',   type: Number },
   { name: 'online_action_timeout',      alias: 'o',   type: Number },
   { name: 'handle_new_user_timeout',    alias: 'h',   type: Number },
+  { name: 'thanksgiving_timeout',       alias: 't',   type: Number },  
   
   { name: 'groupId',                    alias: 'g',   type: String },
   { name: 'dbHost',                     alias: 'dbh', type: String },
@@ -44,6 +46,7 @@ var options = {
   "repeat_invitation_timeout": 60000,
   "online_action_timeout": 60000,
   "handle_new_user_timeout": 120000,
+  "thanksgiving_timeout": 30000,
   "dbHost":"localhost",
   "dbUser":"root",
   "dbPassword":"123",
@@ -202,6 +205,30 @@ function inviteToGroup(steamId) {
         //userService.setChatState(steamId, ChatState.GROUP_INVITATION_SENT);
         return callback(null);
       }, config.inviteToGroup[0].invitationTimeout[0]);
+    }
+  ]);
+}
+
+/*
+  Отправить сообщение с благодарностью за вступление в группу
+*/
+function sendThanksMessage(steamId) {
+  async.series([
+    (callback)=>{
+      setTimeout(()=>{
+        // "Притвориться", что бот печатает сообщение
+        steamUser.chatTyping(steamId);
+        return callback(null);
+      }, config.sendThanksMessage[0].readingTimeout[0]);
+    },
+    (callback)=>{
+      setTimeout(()=>{
+        var msg = config.sendThanksMessage[0].thanksMessage[0];
+        steamUser.chatMessage(steamId, msg);
+        userService.setSendThanksState(steamId, SendThanksState.DONE);
+        log(LogStatus.LOG, `Отправил благодарность за вступление в группу Пользователю ${steamId}`);
+        return callback(null);
+      }, config.sendThanksMessage[0].typingTimeout[0]);
     }
   ]);
 }
@@ -535,6 +562,22 @@ function handleNewUser(){
 }
 
 /*
+  Получить из БД steamId одного пользователя вступившего в группу и отправить ему сообщение с благодарностью  
+*/
+function handleThanksgiving(){
+  userService.getThankworthyUserSteamId((err, steamId)=>{        
+    if (err) {
+      log(LogStatus.ERR, err.message);
+      return;
+    };
+    // Если steamId undefined, значит новых вступивших в группу не появилось...
+    if (!steamId)
+      return;
+    sendThanksMessage(steamId);
+  });
+}
+
+/*
   Обработка изменения состояния дружбы с пользователем, во время онлайна
 
   ВНИМАНИЕ: вызывать только внутри steamUser.on('friendRelationship')            
@@ -668,9 +711,14 @@ steamUser.on('loggedOn', function(details) {
           handleNewUser();
 
           /*
-            С периочностью timeout милисекунд вызывать метод обрабатывающий нового Пользователя из БД            
+            С периочностью timeout миллисекунд вызывать метод обрабатывающий нового Пользователя из БД            
           */
           setInterval(handleNewUser, blurTimeout(options.handle_new_user_timeout));
+          
+          /*
+            С периочностью timeout миллисекунд вызывать метод благодарящий одного пользователя вступившего в группу
+          */
+          setInterval(handleThanksgiving, blurTimeout(options.thanksgiving_timeout));
         }
       );
 

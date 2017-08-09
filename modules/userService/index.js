@@ -1,9 +1,10 @@
-var async       = require('async');
-var mysql       = require('mysql');
-var FriendState = require('../friendState');
-var ChatState   = require('../chatState');
-var GroupState  = require('../groupState');
-var LogStatus  = require('../logStatus');
+var async           = require('async');
+var mysql           = require('mysql');
+var FriendState     = require('../friendState');
+var ChatState       = require('../chatState');
+var GroupState      = require('../groupState');
+var SendThanksState = require('../sendThanksState');
+var LogStatus       = require('../logStatus');
 
 module.exports = UserService;
 
@@ -162,7 +163,7 @@ UserService.prototype.initDBRecords = function (targetSteamIds, callback){
           groupState,
           botAccountName,
           lastInvitationDate,
-          sendThanks)
+          sendThanksState)
       VALUES
         (
           "${steamId}",
@@ -231,7 +232,7 @@ UserService.prototype.pickNewUser = function(callback){
             AND
             groupState			= 0
             AND
-            sendThanks			=	0
+            sendThanksState	=	0
           LIMIT
             1`,
           (err, results, fields)=>{
@@ -562,13 +563,55 @@ UserService.prototype.getLastInvitationDate  = function(steamId, callback) {
   });
 }
 
-UserService.prototype.getSendThanks  = function(steamId, callback) {
+/*
+  Получить steamId пользователя, которому необходимо отправить благодарность
+*/
+UserService.prototype.getThankworthyUserSteamId  = function(callback) {
   // Проверить является ли callback функцией
   callback = typeof callback === 'function' ? callback : function(){};
   
-  selectFieldBySteamId(steamId, "sendThanks", (err, result)=>{
+  connection.query(`
+    SELECT
+      steamId
+    FROM
+      users
+    WHERE
+      botAccountName  = "${this.botAccountName}"
+      AND
+      groupId         = "${this.groupId}"
+      AND
+      sendThanksState	=	"${SendThanksState.GOT_TO}"
+    LIMIT
+      1`,
+    (err, results, fields)=>{
+      if (err) return callback(new Error(`Произошла ошибка при попытке получения steamId записи Пользователя, которого необходимо поблагодарить за вступление в группу.\n    Причина: ${err.message}`));
+      if (results.length == 0) return callback(null);
+      var steamId = results[0]["steamId"];
+      return callback(null, steamId);
+    }
+  );
+}
+
+UserService.prototype.getSendThanksState  = function(steamId, callback) {
+  // Проверить является ли callback функцией
+  callback = typeof callback === 'function' ? callback : function(){};
+  
+  selectFieldBySteamId(steamId, "sendThanksState", (err, result)=>{
     if (err) {
-      var errMsg = `Произошла ошибка при выполнение функции userService.getSendThanks() Причина: ${err.message}`;
+      var errMsg = `Произошла ошибка при выполнение функции userService.getSendThanksState() Причина: ${err.message}`;
+      return callback(new Error(errMsg));
+    }
+    return callback(null, result);
+  });
+}
+
+UserService.prototype.setSendThanksState  = function(steamId, sendThanksState, callback) {
+  // Проверить является ли callback функцией
+  callback = typeof callback === 'function' ? callback : function(){};
+  
+  updateFieldBySteamId(steamId, "sendThanksState", sendThanksState, (err, result)=>{
+    if (err) {
+      var errMsg = `Произошла ошибка при выполнение функции userService.setSendThanksState() Причина: ${err.message}`;
       return callback(new Error(errMsg));
     }
     return callback(null, result);
