@@ -36,7 +36,7 @@ ________________________________________________________________________________
          steamId - groupId
 
   - Запуск ботов с параметрами
-    bot1 - login, paswword, mail, chat_config, friend_invitation_timeout      
+    bot1 - login, paswword, mail, chat_config, friend_invitation_timeout
 
     https://stackoverflow.com/questions/18862214/start-another-node-application-using-node-js
   
@@ -62,7 +62,7 @@ ________________________________________________________________________________
 ___________________________________________________________________________________________________________
 Бот
 
-  - Параметры запуска бота
+  + Параметры запуска бота
       'login'                     - логин аккаунта steam
       'password'                  - пароль от аккаунта steam
       'chat_config'               - конфиг с фразами и таймаутами "чтения", "печатания", отправки

@@ -6,6 +6,7 @@ var async               = require('async');
 var commandLineArgs     = require('command-line-args');
 var fs                  = require('fs');
 var xml2js              = require('xml2js');
+var join                = require('path').join;
 var moment              = require('moment');
     moment.locale('ru');
 var FriendState         = require('./modules/friendState');
@@ -16,19 +17,19 @@ var UserService         = require('./modules/userService');
 var LogStatus           = require('./modules/logStatus');
 
 const optionDefinitions = [
-  { name: 'login',                      alias: 'l',   type: String },
-  { name: 'password',                   alias: 'p',   type: String },
-  { name: 'chat_config',                alias: 'c',   type: String },
-  { name: 'repeat_invitation_timeout',  alias: 'r',   type: Number },
-  { name: 'online_action_timeout',      alias: 'o',   type: Number },
-  { name: 'handle_new_user_timeout',    alias: 'h',   type: Number },
-  { name: 'thanksgiving_timeout',       alias: 't',   type: Number },  
+  { name: 'login',                      type: String },
+  { name: 'password',                   type: String },
+  { name: 'chat_config',                type: String },
+  { name: 'repeat_invitation_timeout',  type: Number },
+  { name: 'online_action_timeout',      type: Number },
+  { name: 'handle_new_user_timeout',    type: Number },
+  { name: 'thanksgiving_timeout',       type: Number },  
   
-  { name: 'groupId',                    alias: 'g',   type: String },
-  { name: 'dbHost',                     alias: 'dbh', type: String },
-  { name: 'dbUser',                     alias: 'dbu', type: String },
-  { name: 'dbPassword',                 alias: 'dbp', type: String },
-  { name: 'dbDatabase',                 alias: 'dbd', type: String }
+  { name: 'groupId',                    type: String },
+  { name: 'dbHost',                     type: String },
+  { name: 'dbUser',                     type: String },
+  { name: 'dbPassword',                 type: String },
+  { name: 'dbDatabase',                 type: String }
 ];
 
 // Параметры запуска бота. В обычном режиме получаются через командную строку  
@@ -36,15 +37,16 @@ var options = {};
 
 // Проверить был ли запущен код через childProcess.fork | https://coderwall.com/p/_gvaoa/detect-if-a-script-has-been-forked-in-nodejs
 if (process.send) {
-  options = commandLineArgs(optionDefinitions);
+  options = commandLineArgs(optionDefinitions);  
+  console.log(options);
 } else {
   log(LogStatus.LOG, `Запуск в режиме отладки...`);
   // Если код запущен в режиме отладки параметры командной строки игнорируются
   options = {
-    "login": "djtaffy1",
-    "password": "mxi7mngs4",  
+    "login": "pimgik",
+    "password": "VFVekbxrf49",
     "groupId":"103582791459120719",
-    "chat_config":"chat_config.xml",
+    "chat_config":"TestRiders.xml",
     "repeat_invitation_timeout": 60000,
     "online_action_timeout": 60000,
     "handle_new_user_timeout": 120000,
@@ -59,23 +61,50 @@ if (process.send) {
 var userService = new UserService(options);
 var steamUser = new SteamUser();
 var config = {};
-
 log(LogStatus.LOG, `Получение конфига...`);
-
 // Инициализация
-getConfig(options.chat_config, (result)=>{  
+getConfig(options.chat_config, (err, result)=>{  
+  if (err) {
+    var errMsg = `Не удалось получить конфигурацию.\n    Причина: ${err.message}`;
+    log(LogStatus.ERR, errMsg);
+    throw new Error(errMsg);
+  }
+
   config = result;
   log(LogStatus.LOG, `Конфиг получен.`);
   log(LogStatus.LOG, `Вход в Steam...`);
 
   steamUser.logOn({
-    "accountName": options.login,
-    "password": options.password
+    accountName: options.login,
+    password: options.password,
+    dontRememberMachine: true
   });
 });
 
-function getConfig(path, callback){
-  
+function logon(type, code){
+  if (type=="auth"){
+    log(LogStatus.LOG, `Получен код auth`);
+    steamUser.logOn({
+      accountName: options.login,
+      password: options.password,
+      dontRememberMachine: true,
+      authCode: code      
+    });
+  }
+
+  if (type=="two-factor"){
+    log(LogStatus.LOG, `Получен код two-factor`);
+    steamUser.logOn({
+      accountName: options.login,
+      password: options.password,
+      dontRememberMachine: true,  
+      twoFactorCode: code
+    });
+  }
+}
+
+function getConfig(configName, callback){
+  var path = join(__dirname, `chat_configs/${configName}`);
   async.waterfall([
     (callback)=>{
       fs.exists(path, (exists)=>{
@@ -94,13 +123,13 @@ function getConfig(path, callback){
       parser.parseString(data, (err, jsObject)=>{
         if (err) return callback(new Error(`Не удалось преобразовать xml конфигурацию в js-объект. \n    Причина:${err.message}`));
         return callback(null, jsObject.config);
-      });      
+      });
     }
   ],
   (err, result)=>{
     if (err) return callback(err);
-    return callback(result);
-  });    
+    return callback(null, result);
+  });
 }
 
 /*
@@ -108,7 +137,8 @@ function getConfig(path, callback){
 */
 function log(status, msg, debug){
   console.log(`${LogStatus[status]} ${msg}`);  
-  userService.log(LogStatus[status], msg);
+  if (userService)
+    userService.log(LogStatus[status], msg);
 }
 
 /*
@@ -526,7 +556,7 @@ function handleNewUser(){
   
   userService.pickNewUser((err, steamId)=>{
     if (err) {
-      log(LogStatus.WRN, `Произошла ошибка при попытке получения steamId нового пользователя для обработки. Сообщение: ${err.message}`);
+      log(LogStatus.WRN, `Произошла ошибка при попытке получения steamId нового пользователя для обработки. \n Сообщение: ${err.message}`);
       return;
     }
     // Если пользователь уже находится в друзьях, то по его steamId массив steamUser.myFriends
@@ -739,13 +769,17 @@ steamUser.on('disconnected', function(eresult, msg){
   log(LogStatus.ERR, `Отключен от Steam. \n    Причина отключения (может быть неопределенной): ${msg}`);
 });
 
-/*
-  Обработка события запроса кода аутентификации SteamGuard
-*/ 
+// /*
+//   Обработка события запроса кода аутентификации SteamGuard
+// */ 
 // steamUser.on('steamGuard', function(email, callback, lastCodeWrong){
-//  process.on('getSteamGuardCode',(code)=>{callback(code)});
-//   // что-то типа
-//   process.on('codeReceived', ()=>{
-//     callback(code)
-//   });  
+//   log(LogStatus.ERR, `Требуется SteamGuard код`);
+//   //process.on('getSteamGuardCode',(code)=>{callback(code)});  
 // });
+
+process.on('message', (data) => {
+  log(LogStatus.LOG,`Получил message от parent...`);  
+  if (data.type && (data.type == "auth" || data.type == "two-factor")){
+    logon(data.type, data.code);
+  }
+});
