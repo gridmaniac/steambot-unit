@@ -43,17 +43,17 @@ if (process.send) {
   log(LogStatus.LOG, `Запуск в режиме отладки...`);
   // Если код запущен в режиме отладки параметры командной строки игнорируются
   options = {
-    "login": "pimgik",
-    "password": "VFVekbxrf49",
+    "login": "djtaffy1",
+    "password": "mxi7mngs4",
     "groupId":"103582791459120719",
     "chat_config":"TestRiders.xml",
     "repeat_invitation_timeout": 60000,
-    "online_action_timeout": 60000,
+    "online_action_timeout": 5000,
     "handle_new_user_timeout": 120000,
-    "thanksgiving_timeout": 30000,
+    "thanksgiving_timeout": 10000,
     "dbHost":"localhost",
     "dbUser":"root",
-    "dbPassword":"123",
+    "dbPassword":"",
     "dbDatabase":"steam-bot"
   };
 }
@@ -138,7 +138,7 @@ function getConfig(configName, callback){
 function log(status, msg, debug){
   console.log(`${LogStatus[status]} ${msg}`);  
   if (userService)
-    userService.log(LogStatus[status], msg);
+    userService.log(LogStatus[status], msg.replace('"', ''));
 }
 
 /*
@@ -718,7 +718,7 @@ steamUser.on('loggedOn', function(details) {
             // TODO протестировать
           */ 
           steamUser.on('friendMessage',function(steamId, msg) {
-            log(LogStatus.LOG, `Получил сообщение от Пользователя ${steamId}: "${msg}"`);
+            log(LogStatus.LOG, `Получил сообщение от Пользователя ${steamId}: '${msg}'`);
             handleMessage(steamId.getSteamID64());
           });
 
